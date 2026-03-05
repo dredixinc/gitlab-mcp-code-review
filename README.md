@@ -141,7 +141,8 @@ The MCP server provides the following tools for interacting with GitLab:
 | `fetch_merge_request_diff` | Get diffs for a specific merge request |
 | `fetch_commit_diff` | Get diff information for a specific commit |
 | `compare_versions` | Compare different branches, tags, or commits |
-| `add_merge_request_comment` | Add a comment to a merge request |
+| `add_merge_request_comment` | Add a regular or resolvable comment to a merge request |
+| `get_merge_request_comments` | Fetch all comments on a merge request |
 | `approve_merge_request` | Approve a merge request |
 | `unapprove_merge_request` | Unapprove a merge request |
 | `get_project_merge_requests` | Get a list of merge requests for a project |
@@ -172,8 +173,21 @@ diff = compare_versions("123", "develop", "master")
 ### Add a Comment to a Merge Request
 
 ```python
-# Add a comment to a merge request
+# Add a regular comment to a merge request
 comment = add_merge_request_comment("123", "5", "This code looks good!")
+
+# Add a resolvable discussion thread (can be marked resolved/unresolved)
+comment = add_merge_request_comment("123", "5", "Please fix this.", resolvable=True)
+```
+
+### Fetch Comments on a Merge Request
+
+```python
+# Get all comments, oldest first (default)
+comments = get_merge_request_comments("123", "5")
+
+# Get comments sorted by most recently updated
+comments = get_merge_request_comments("123", "5", sort="desc", order_by="updated_at")
 ```
 
 ### Approve a Merge Request

@@ -90,9 +90,7 @@ async def gitlab_lifespan(server: FastMCP) -> AsyncIterator[GitLabContext]:
 # Create MCP server
 mcp = FastMCP(
     "GitLab MCP for Code Review",
-    description="MCP server for reviewing GitLab code changes",
-    lifespan=gitlab_lifespan,
-    dependencies=["python-dotenv", "requests"]
+    lifespan=gitlab_lifespan
 )
 
 @mcp.tool()
@@ -221,35 +219,57 @@ def compare_versions(ctx: Context, project_id: str, from_sha: str, to_sha: str) 
     return compare_info
 
 @mcp.tool()
-def add_merge_request_comment(ctx: Context, project_id: str, merge_request_iid: str, body: str, position: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def add_merge_request_comment(ctx: Context, project_id: str, merge_request_iid: str, body: str, position: Optional[Dict[str, Any]] = None, resolvable: bool = False) -> Dict[str, Any]:
     """
     Add a comment to a merge request, optionally at a specific position in a file.
-    
+
     Args:
         project_id: The GitLab project ID or URL-encoded path
         merge_request_iid: The merge request IID (project-specific ID)
         body: The comment text
         position: Optional position data for line comments
+        resolvable: If True, creates the comment as a resolvable discussion thread
+                    via the /discussions endpoint. Regular notes (/notes) are not resolvable.
     Returns:
         Dict containing the created comment information
     """
-    # Create the comment data
-    data = {
-        "body": body
-    }
-    
-    # Add position data if provided
+    data = {"body": body}
+
     if position:
         data["position"] = position
-    
-    # Add the comment
-    comment_endpoint = f"projects/{quote(project_id, safe='')}/merge_requests/{merge_request_iid}/notes"
-    comment_info = make_gitlab_api_request(ctx, comment_endpoint, method="POST", data=data)
-    
+
+    if resolvable:
+        endpoint = f"projects/{quote(project_id, safe='')}/merge_requests/{merge_request_iid}/discussions"
+    else:
+        endpoint = f"projects/{quote(project_id, safe='')}/merge_requests/{merge_request_iid}/notes"
+
+    comment_info = make_gitlab_api_request(ctx, endpoint, method="POST", data=data)
+
     if not comment_info:
         raise ValueError("Failed to add comment to merge request")
-    
+
     return comment_info
+
+@mcp.tool()
+def get_merge_request_comments(ctx: Context, project_id: str, merge_request_iid: str, sort: str = "asc", order_by: str = "created_at") -> List[Dict[str, Any]]:
+    """
+    Fetch all comments (notes) on a merge request.
+
+    Args:
+        project_id: The GitLab project ID or URL-encoded path
+        merge_request_iid: The merge request IID (project-specific ID)
+        sort: Sort order (asc or desc) - default: asc
+        order_by: Order by field (created_at or updated_at) - default: created_at
+    Returns:
+        List of comment objects
+    """
+    notes_endpoint = f"projects/{quote(project_id, safe='')}/merge_requests/{merge_request_iid}/notes?sort={sort}&order_by={order_by}"
+    notes = make_gitlab_api_request(ctx, notes_endpoint)
+
+    if notes is None:
+        raise ValueError(f"Failed to fetch comments for merge request {merge_request_iid}")
+
+    return notes
 
 @mcp.tool()
 def approve_merge_request(ctx: Context, project_id: str, merge_request_iid: str, approvals_required: Optional[int] = None) -> Dict[str, Any]:
